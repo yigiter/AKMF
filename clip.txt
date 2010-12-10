@@ -1,0 +1,83 @@
+/*
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x40;rwbuf[3]=0xc0;rwbuf[4]=0xc0;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x20;rwbuf[3]=0xa0;rwbuf[4]=0xa0;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x10;rwbuf[3]=0x90;rwbuf[4]=0x90;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x8;rwbuf[3]=0x88;rwbuf[4]=0x88;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x4;rwbuf[3]=0x84;rwbuf[4]=0x8c;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x2;rwbuf[3]=0x82;rwbuf[4]=0x8e;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x3;rwbuf[3]=0x81;rwbuf[4]=0x8f;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+	rwbuf[0]=4;rwbuf[1]=0xe1;rwbuf[2]=0x2;rwbuf[3]=0x80;rwbuf[4]=0x8e;rv=ioctl(fakm, ECS_IOCTL_WRITE, &rwbuf);
+
+	mode=0;rv=ioctl(fakm, ECS_IOCTL_SET_MODE, &mode);
+	rv=ioctl(fakm, ECS_IOCTL_GETDATA, akmdat);
+*/
+
+
+
+
+Old Main
+----------------------------------------------
+	//Start the ultimate loop
+	//while (1) {
+	{
+		//Make everything sleep till the sensors get resumed by the Android power manager
+		rv=ioctl(fakm,ECS_IOCTL_GET_OPEN_STATUS, &status);	//This make the main thread sleep inside the kernel
+		if (status!=1) {
+			fprintf(stderr,"undefined GET_OPEN_STATUS behaviour");
+			exit(1);
+		}
+
+		//We woke up
+		fflag=getcalib(akmcalib, bmacalib, dacoffset);	//Read the calibration matrix elements. Each time the system resumes it reads the new calib parameters.
+		acflag=1;		//Set the flag so that other thread can run (no need for mutex)
+
+		//Start the sensor data reading thread
+		pthread_create(&meas_tid, NULL, MeasureLoop, NULL);
+
+
+		//Start the keypad polling event - I am not going to implement
+		pthread_create(&sld_tid, NULL, SliderDetectThread, NULL);
+
+		//Make the main thread sleep again till the sensors are suspended by framework
+		rv=ioctl(fakm, ECS_IOCTL_GET_CLOSE_STATUS, &status);
+
+		//In case other threads have not been terminated, make them stop and exit
+		acflag=0;
+
+		//Make sure other threads return
+		pthread_join(meas_tid, NULL);
+		pthread_join(sld_tid, &rvp);
+
+		//Write the calib parameters to the file
+		if (fflag)
+			writecalib(akmcalib, bmacalib, dacoffset);
+
+	}
+
+
+

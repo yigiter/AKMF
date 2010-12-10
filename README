@@ -1,0 +1,5 @@
+This is the open source version of AKMD (sensor daemon) for HTC Hero.
+
+This version (AKMF) has exactly the same ioctl footprint with that of AKMD.
+In addition to its compatability, this version also lets external calibration parameters to be used inside the daemon.
+
